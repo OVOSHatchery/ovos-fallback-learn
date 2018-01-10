@@ -14,7 +14,7 @@
 
 from os.path import join, exists
 from os import makedirs
-from mycroft.util import LOG
+from mycroft.util.log import LOG
 from mycroft.skills.core import FallbackSkill
 import random
 
@@ -24,7 +24,6 @@ class LearnUnknownSkill(FallbackSkill):
         super(LearnUnknownSkill, self).__init__()
         # start a utterance database
         self.entity_words = []
-        self.questions = []
         if "utterance_db" not in self.settings:
             self.settings["utterance_db"] = {self.lang: {}}
         if "entity_db" not in self.settings:
@@ -32,11 +31,11 @@ class LearnUnknownSkill(FallbackSkill):
 
     def initialize(self):
         self.entity_words = self.read_voc_lines("entity_words")
-        self.questions = self.read_dialog_lines("what.is")
+
         # high priority to always call handler, tweak number if you only
         # want utterances after a certain fallback
 
-        self.register_fallback(self.handle_fallback, 1)
+        self.register_fallback(self.handle_fallback, 10)
 
         # register learned utterances
         self.create_learned_intents()
@@ -56,11 +55,6 @@ class LearnUnknownSkill(FallbackSkill):
         # create it, add "chicken" to that file
         self.register_intent_file("entity_is.intent",
                                   self.handle_new_entity)
-
-    def read_dialog_lines(self, name):
-        with open(join(self._dir, "dialog", self.lang, name + '.dialog')) \
-                as f:
-            return filter(bool, map(str.strip, f.read().split('\n')))
 
     def read_voc_lines(self, name):
         with open(join(self.vocab_dir, name + '.voc')) as f:
@@ -129,7 +123,7 @@ class LearnUnknownSkill(FallbackSkill):
                             entity + ".entity")
                 if exists(path):
                     with open(path, "r") as f:
-                        lines = f.readlines
+                        lines = f.readlines()
                 else:
                     lines = []
 
@@ -146,6 +140,7 @@ class LearnUnknownSkill(FallbackSkill):
             if utterance:
                 LOG.info("unknown utterance: " + str(utterance))
                 answers = utterances[utterance]
+                LOG.info("possible answers: " + str(answers))
                 if len(answers):
                     utterance = self.parse_entities(utterance)
                     # create intent file for padatious
@@ -186,19 +181,35 @@ class LearnUnknownSkill(FallbackSkill):
                         self.speak_dialog(utterance, data)
 
                     # register learned intent
-                    self.remove_event(utterance + '.intent')
+                    self.remove_event(str(self.skill_id) + ':' + utterance + '.intent')
                     self.register_intent_file(utterance + '.intent', handler)
 
     def handle_new_entity(self, message):
         value = message.data.get("value")
         entity = message.data.get("entity")
-        if entity not in self.settings["entity_db"][
-            self.lang.keys()]:
+        lang = message.data.get("lang", self.lang)
+        if entity not in self.settings["entity_db"][self.lang].keys():
             self.settings["entity_db"][self.lang][entity] = [value]
         else:
             self.settings["entity_db"][self.lang][entity].append(value)
+
+        values = self.settings["entity_db"][self.lang][entity]
+        path = join(self._dir, "vocab", lang, entity + ".entity")
+
+        if not exists(path):
+            with open(path, "w") as f:
+                f.writelines(values)
+        else:
+            with open(path, "r") as f:
+                lines = f.readlines()
+
+            with open(path, "a") as f:
+                for value in values:
+                    if value not in lines:
+                        f.write(value + "\n")
+
         self.register_entity_file(entity + ".entity")
-        self.speak_dialog("new.entity")
+        self.speak_dialog("new.entity", {"entity": entity, "value": value})
 
     def handle_new_answer(self, message):
         answer = message.data.get("answer")
@@ -216,18 +227,22 @@ class LearnUnknownSkill(FallbackSkill):
         utterances = self.settings["utterance_db"][self.lang]
         # if there are utterances in db
         if len(utterances):
+            LOG.info("utterances to learn: " + str(utterances))
             # pick a random one
             utterance = random.choice(utterances.keys())
             answers = utterances[utterance]
             # if less than 2 sample answers
             if len(answers) < 2:
                 # ask user for answer
-                question = random.choice(self.questions)
-                answer = self.get_response(question)
+                answer = self.get_response("what.is", {"question": utterance})
                 if answer:
                     answer = self.parse_entities(answer)
                     # if user answered add to database
                     self.add_utterances_to_db(utterance, answer, self.lang)
+                    self.speak_dialog("new.answer",
+                                      {"question": utterance, "answer":
+                                          answer})
+                    self.create_learned_intents()
         else:
             self.speak_dialog("nothing.to.learn")
 
