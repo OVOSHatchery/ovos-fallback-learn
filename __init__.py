@@ -17,34 +17,74 @@ from mycroft.skills.core import FallbackSkill
 from mycroft.util.parse import normalize
 
 
-class UnknownSkill(FallbackSkill):
+class LearnUnknownSkill(FallbackSkill):
     def __init__(self):
-        super(UnknownSkill, self).__init__()
+        super(LearnUnknownSkill, self).__init__()
+        # start a utterance database
+        if "db" not in self.settings:
+            self.settings["db"] = {self.lang: {}}
 
     def initialize(self):
-        self.register_fallback(self.handle_fallback, 100)
+        # high priority to always call handler
+        self.register_fallback(self.handle_fallback, 1)
 
-    def read_voc_lines(self, name):
-        with open(join(self.vocab_dir, name + '.voc')) as f:
-            return filter(bool, map(str.strip, f.read().split('\n')))
+        # register learned utterances
+        self.create_learned_intents()
+
+        # TODO intent to ask answer samples and update db
+        # TODO the answer for X is Y intent
+
+    def add_utterance_to_db(self, utterance, answers=None, lang=None):
+        # accept string or list input
+        if not isinstance(answers, list):
+            answers = [answers]
+
+        lang = lang or self.lang
+
+        # store utterance in db for later learning
+        if lang not in self.settings["db"]:
+            self.settings["db"][lang] = {}
+
+        if utterance not in self.settings["db"][lang]:
+            self.settings["db"][lang][utterance] = answers
+
+        # optionally do a manual settings save
+        self.settings.store()
+
+    def create_learned_intents(self):
+        utterances = self.settings["db"][self.lang]
+        for utterance in utterances:
+            answers = utterances[utterance]
+            if len(answers):
+                # create intent file for padatious
+                path = join(self._dir, "vocab", self.lang,
+                            utterance+".intent")
+                with open(path, "w") as f:
+                    f.write(utterance)
+
+                # create learned answers dialog file
+                path = join(self._dir, "dialog", self.lang,
+                            utterance + ".dialog")
+                with open(path, "w") as f:
+                    f.writelines(answers)
+
+                # create simple handler that speak dialog
+                def handler(message):
+                    self.speak_dialog(utterance)
+
+                # register learned intent
+                self.register_intent_file(utterance + '.intent', handler)
 
     def handle_fallback(self, message):
         utterance = normalize(message.data['utterance'])
+        lang = message.data.get("lang", self.lang)
 
-        try:
-            self.report_metric('failed-intent', {'utterance': utterance})
-        except:
-            self.log.exception('Error reporting metric')
+        # add utterance to db without answers
+        self.add_utterance_to_db(utterance, lang=lang)
 
-        for i in ['question', 'who.is', 'why.is']:
-            for l in self.read_voc_lines(i):
-                if utterance.startswith(l):
-                    self.log.info('Fallback type: ' + i)
-                    self.speak_dialog(i, data={'remaining': l.replace(i, '')})
-                    return True
-        self.speak_dialog('unknown')
-        return True
+        # always return False so other fallbacks may still trigger
+        return False
 
 
 def create_skill():
-    return UnknownSkill()
+    return LearnUnknownSkill()
