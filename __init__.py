@@ -23,12 +23,15 @@ class LearnUnknownSkill(FallbackSkill):
     def __init__(self):
         super(LearnUnknownSkill, self).__init__()
         # start a utterance database
+        self.entity_words = []
         if "utterance_db" not in self.settings:
             self.settings["utterance_db"] = {self.lang: {}}
         if "entity_db" not in self.settings:
             self.settings["entity_db"] = {self.lang: {}}
 
     def initialize(self):
+        self.entity_words = self.read_voc_lines("entity_words")
+
         # high priority to always call handler, tweak number if you only
         # want utterances after a certain fallback
 
@@ -45,8 +48,30 @@ class LearnUnknownSkill(FallbackSkill):
         # "chicken is an example of animal" -> if animal.entity does not exist
         # create it, add "chicken" to that file
 
+    def read_voc_lines(self, name):
+        with open(join(self.vocab_dir, name + '.voc')) as f:
+            return filter(bool, map(str.strip, f.read().split('\n')))
+
+    def parse_entities(self, answer):
+        # do some parsing so if in the user spoken answer there
+        # is "X entity", replace "X entity" by "{X}"
+        words = answer.split(" ")
+        for idx, word in enumerate(words):
+            if idx <= 0:
+                continue
+            word_prev = words[idx - 1]
+            if word in self.entity_words:
+                entity = word_prev
+                words[idx] = ""
+                words[idx - 1] = "{" + entity + "}"
+                if entity not in self.settings["entity_db"][
+                    self.lang.keys()]:
+                    self.settings["entity_db"][self.lang][entity] = []
+
+        return " ".join(words)
+
     def handle_learn(self, message):
-        utterances = self.settings["db"][self.lang]
+        utterances = self.settings["utterance_db"][self.lang]
         # if there are utterances in db
         if len(utterances):
             # pick a random one
@@ -57,11 +82,8 @@ class LearnUnknownSkill(FallbackSkill):
                 # ask user for answer
                 question = self.dialog_renderer.render("what.answer", {"question": utterance})
                 answer = self.get_response(question)
-                # TODO add some parsing so if in the user spoken answer there
-                # is "X entity" it replace it by "{X}"
-                # create .entity file
-
                 if answer:
+                    answer = self.parse_entities(answer)
                     # if user answered add to database
                     self.add_utterances_to_db(utterance, answer, self.lang)
 
@@ -103,7 +125,7 @@ class LearnUnknownSkill(FallbackSkill):
             # create intent file for padatious
             path = join(self._dir, "vocab", self.lang,
                         entity + ".entity")
-            with open(path, "w") as f:
+            with open(path, "a") as f:
                 f.write(values)
             self.register_entity_file(entity + ".entity")
 
@@ -115,13 +137,13 @@ class LearnUnknownSkill(FallbackSkill):
                 # create intent file for padatious
                 path = join(self._dir, "vocab", self.lang,
                             utterance+".intent")
-                with open(path, "w") as f:
-                    f.write(utterance)
+                with open(path, "a") as f:
+                    f.write(utterance+"\n")
 
                 # create learned answers dialog file
                 path = join(self._dir, "dialog", self.lang,
                             utterance + ".dialog")
-                with open(path, "w") as f:
+                with open(path, "a") as f:
                     f.writelines(answers)
 
                 # create simple handler that speak dialog
