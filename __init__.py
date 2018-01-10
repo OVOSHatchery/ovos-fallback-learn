@@ -86,6 +86,8 @@ class LearnUnknownSkill(FallbackSkill):
                     answer = self.parse_entities(answer)
                     # if user answered add to database
                     self.add_utterances_to_db(utterance, answer, self.lang)
+        else:
+            self.speak_dialog("nothing.to.learn")
 
     def add_utterances_to_db(self, utterances, answers=None, lang=None):
         # accept string or list input
@@ -125,8 +127,14 @@ class LearnUnknownSkill(FallbackSkill):
             # create intent file for padatious
             path = join(self._dir, "vocab", self.lang,
                         entity + ".entity")
+            with open(path, "r") as f:
+                lines = f.readlines
+
             with open(path, "a") as f:
-                f.write(values)
+                for value in values:
+                    if value not in lines:
+                        f.write(value+"\n")
+
             self.register_entity_file(entity + ".entity")
 
         # create .intent and .dialog
@@ -134,6 +142,7 @@ class LearnUnknownSkill(FallbackSkill):
         for utterance in utterances:
             answers = utterances[utterance]
             if len(answers):
+                utterance = self.parse_entities(utterance)
                 # create intent file for padatious
                 path = join(self._dir, "vocab", self.lang,
                             utterance+".intent")
@@ -143,12 +152,22 @@ class LearnUnknownSkill(FallbackSkill):
                 # create learned answers dialog file
                 path = join(self._dir, "dialog", self.lang,
                             utterance + ".dialog")
+
+                with open(path, "r") as f:
+                    lines = f.readlines
+
                 with open(path, "a") as f:
-                    f.writelines(answers)
+                    for answer in answers:
+                        if answer not in lines:
+                            f.write(answer + "\n")
 
                 # create simple handler that speak dialog
                 def handler(message):
-                    self.speak_dialog(utterance)
+                    data = {}
+                    for entity in entitys:
+                        if message.data.get(entity):
+                            data[entity] = message.data.get(entity)
+                    self.speak_dialog(utterance, data)
 
                 # register learned intent
                 self.register_intent_file(utterance + '.intent', handler)
