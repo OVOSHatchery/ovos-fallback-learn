@@ -15,6 +15,7 @@
 from os.path import join
 from mycroft.skills.core import FallbackSkill
 from mycroft.util.parse import normalize
+import random
 
 
 class LearnUnknownSkill(FallbackSkill):
@@ -34,19 +35,41 @@ class LearnUnknownSkill(FallbackSkill):
         # TODO intent to ask answer samples and update db
         # TODO the answer for X is Y intent
 
-    def add_utterance_to_db(self, utterance, answers=None, lang=None):
+    def handle_learn(self, message):
+        utterances = self.settings["db"][self.lang]
+        # if there are utterances in db
+        if len(utterances):
+            # pick a random one
+            utterance = random.choice(utterances.keys())
+            answers = utterances[utterance]
+            # if less than 2 sample answers
+            if len(answers) < 2:
+                # ask user for answer
+                question = self.dialog_renderer.render("what.answer", {"question": utterance})
+                answer = self.get_response(question)
+                if answer:
+                    # if user answered add to database
+                    self.add_utterances_to_db(utterance, answer, self.lang)
+
+    def add_utterances_to_db(self, utterances, answers=None, lang=None):
         # accept string or list input
         if not isinstance(answers, list):
             answers = [answers]
 
+        if not isinstance(utterances, list):
+            utterances = [utterances]
+
         lang = lang or self.lang
 
-        # store utterance in db for later learning
+        # store utterances in db for later learning
         if lang not in self.settings["db"]:
             self.settings["db"][lang] = {}
 
-        if utterance not in self.settings["db"][lang]:
-            self.settings["db"][lang][utterance] = answers
+        for utterance in utterances:
+            if utterance not in self.settings["db"][lang]:
+                self.settings["db"][lang][utterance] = answers
+            else:
+                self.settings["db"][lang][utterance] += answers
 
         # optionally do a manual settings save
         self.settings.store()
@@ -76,11 +99,11 @@ class LearnUnknownSkill(FallbackSkill):
                 self.register_intent_file(utterance + '.intent', handler)
 
     def handle_fallback(self, message):
-        utterance = normalize(message.data['utterance'])
         lang = message.data.get("lang", self.lang)
+        utterance = normalize(message.data['utterance'], lang=lang)
 
         # add utterance to db without answers
-        self.add_utterance_to_db(utterance, lang=lang)
+        self.add_utterances_to_db(utterance, lang=lang)
 
         # always return False so other fallbacks may still trigger
         return False
