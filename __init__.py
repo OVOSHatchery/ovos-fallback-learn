@@ -40,6 +40,7 @@ class LearnUnknownSkill(FallbackSkill):
         # register learned utterances
         self.create_learned_intents()
 
+        # TODO intent to register learned utterances
         # TODO intent to ask answer samples and update db
         # create intent for handle_learn
         # TODO intent  the answer for X is Y intent
