@@ -22,18 +22,27 @@ class LearnUnknownSkill(FallbackSkill):
     def __init__(self):
         super(LearnUnknownSkill, self).__init__()
         # start a utterance database
-        if "db" not in self.settings:
-            self.settings["db"] = {self.lang: {}}
+        if "utterance_db" not in self.settings:
+            self.settings["utterance_db"] = {self.lang: {}}
+        if "entity_db" not in self.settings:
+            self.settings["entity_db"] = {self.lang: {}}
 
     def initialize(self):
-        # high priority to always call handler
+        # high priority to always call handler, tweak number if you only
+        # want utterances after a certain fallback
+
         self.register_fallback(self.handle_fallback, 1)
 
         # register learned utterances
         self.create_learned_intents()
 
         # TODO intent to ask answer samples and update db
-        # TODO the answer for X is Y intent
+        # create intent for handle_learn
+        # TODO intent  the answer for X is Y intent
+        # add X utterance with Y answer handler and create intent
+        # TODO intent  add stuff to .entity files
+        # "chicken is an example of animal" -> if animal.entity does not exist
+        # create it, add "chicken" to that file
 
     def handle_learn(self, message):
         utterances = self.settings["db"][self.lang]
@@ -47,6 +56,10 @@ class LearnUnknownSkill(FallbackSkill):
                 # ask user for answer
                 question = self.dialog_renderer.render("what.answer", {"question": utterance})
                 answer = self.get_response(question)
+                # TODO add some parsing so if in the user spoken answer there
+                # is "X entity" it replace it by "{X}"
+                # create .entity file
+
                 if answer:
                     # if user answered add to database
                     self.add_utterances_to_db(utterance, answer, self.lang)
@@ -62,20 +75,32 @@ class LearnUnknownSkill(FallbackSkill):
         lang = lang or self.lang
 
         # store utterances in db for later learning
-        if lang not in self.settings["db"]:
-            self.settings["db"][lang] = {}
+        if lang not in self.settings["utterance_db"]:
+            self.settings["utterance_db"][lang] = {}
 
         for utterance in utterances:
-            if utterance not in self.settings["db"][lang]:
-                self.settings["db"][lang][utterance] = answers
+            if utterance not in self.settings["utterance_db"][lang]:
+                self.settings["utterance_db"][lang][utterance] = answers
             else:
-                self.settings["db"][lang][utterance] += answers
+                self.settings["utterance_db"][lang][utterance] += answers
 
         # optionally do a manual settings save
         self.settings.store()
 
     def create_learned_intents(self):
-        utterances = self.settings["db"][self.lang]
+        # create entities
+        entitys = self.settings["entity_db"][self.lang]
+        for entity in entitys:
+            values = entitys[entity]
+            # create intent file for padatious
+            path = join(self._dir, "vocab", self.lang,
+                        entity + ".entity")
+            with open(path, "w") as f:
+                f.write(values)
+            self.register_entity_file(entity + ".entity")
+
+        # create .intent and .dialog
+        utterances = self.settings["utterance_db"][self.lang]
         for utterance in utterances:
             answers = utterances[utterance]
             if len(answers):
