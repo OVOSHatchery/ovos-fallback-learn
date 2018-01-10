@@ -40,9 +40,11 @@ class LearnUnknownSkill(FallbackSkill):
         # register learned utterances
         self.create_learned_intents()
 
-        # TODO intent to register learned utterances
-        # TODO intent to ask answer samples and update db
+        # intent to register learned utterances
+        self.register_intent_file("learn.intent", self.handle_learn)
+        # intent to ask answer samples and update db
         # create intent for handle_learn
+        self.register_intent_file("update_learn.intent", self.handle_update_learned)
         # TODO intent  the answer for X is Y intent
         # add X utterance with Y answer handler and create intent
         # TODO intent  add stuff to .entity files
@@ -70,25 +72,6 @@ class LearnUnknownSkill(FallbackSkill):
                     self.settings["entity_db"][self.lang][entity] = []
 
         return " ".join(words)
-
-    def handle_learn(self, message):
-        utterances = self.settings["utterance_db"][self.lang]
-        # if there are utterances in db
-        if len(utterances):
-            # pick a random one
-            utterance = random.choice(utterances.keys())
-            answers = utterances[utterance]
-            # if less than 2 sample answers
-            if len(answers) < 2:
-                # ask user for answer
-                question = self.dialog_renderer.render("what.answer", {"question": utterance})
-                answer = self.get_response(question)
-                if answer:
-                    answer = self.parse_entities(answer)
-                    # if user answered add to database
-                    self.add_utterances_to_db(utterance, answer, self.lang)
-        else:
-            self.speak_dialog("nothing.to.learn")
 
     def add_utterances_to_db(self, utterances, answers=None, lang=None):
         # accept string or list input
@@ -129,8 +112,11 @@ class LearnUnknownSkill(FallbackSkill):
                 # create intent file for padatious
                 path = join(self._dir, "vocab", self.lang,
                             entity + ".entity")
-                with open(path, "r") as f:
-                    lines = f.readlines
+                if exists(path):
+                    with open(path, "r") as f:
+                        lines = f.readlines
+                else:
+                    lines = []
 
                 with open(path, "a") as f:
                     for value in values:
@@ -148,15 +134,26 @@ class LearnUnknownSkill(FallbackSkill):
                 # create intent file for padatious
                 path = join(self._dir, "vocab", self.lang,
                             utterance+".intent")
-                with open(path, "a") as f:
-                    f.write(utterance+"\n")
+
+                if exists(path):
+                    with open(path, "r") as f:
+                        lines = f.readlines()
+                else:
+                    lines = []
+
+                if utterance not in lines:
+                    with open(path, "a") as f:
+                        f.write(utterance+"\n")
 
                 # create learned answers dialog file
                 path = join(self._dir, "dialog", self.lang,
                             utterance + ".dialog")
 
-                with open(path, "r") as f:
-                    lines = f.readlines
+                if exists(path):
+                    with open(path, "r") as f:
+                        lines = f.readlines
+                else:
+                    lines = []
 
                 with open(path, "a") as f:
                     for answer in answers:
@@ -172,7 +169,31 @@ class LearnUnknownSkill(FallbackSkill):
                     self.speak_dialog(utterance, data)
 
                 # register learned intent
+                self.remove_event(utterance + '.intent')
                 self.register_intent_file(utterance + '.intent', handler)
+
+    def handle_update_learned(self, message):
+        self.create_learned_intents()
+        self.speak_dialog("update_learned")
+
+    def handle_learn(self, message):
+        utterances = self.settings["utterance_db"][self.lang]
+        # if there are utterances in db
+        if len(utterances):
+            # pick a random one
+            utterance = random.choice(utterances.keys())
+            answers = utterances[utterance]
+            # if less than 2 sample answers
+            if len(answers) < 2:
+                # ask user for answer
+                question = self.dialog_renderer.render("what.answer", {"question": utterance})
+                answer = self.get_response(question)
+                if answer:
+                    answer = self.parse_entities(answer)
+                    # if user answered add to database
+                    self.add_utterances_to_db(utterance, answer, self.lang)
+        else:
+            self.speak_dialog("nothing.to.learn")
 
     def handle_fallback(self, message):
         lang = message.data.get("lang", self.lang)
