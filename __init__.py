@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from os.path import join
+from os.path import join, exists
+from os import makedirs
 from mycroft.skills.core import FallbackSkill
 from mycroft.util.parse import normalize
 import random
@@ -88,6 +89,13 @@ class LearnUnknownSkill(FallbackSkill):
         self.settings.store()
 
     def create_learned_intents(self):
+        # check paths exist
+        if not exists(join(self._dir, "vocab", self.lang)):
+            makedirs(join(self._dir, "vocab", self.lang))
+
+        if not exists(join(self._dir, "dialog", self.lang)):
+            makedirs(join(self._dir, "dialog", self.lang))
+
         # create entities
         entitys = self.settings["entity_db"][self.lang]
         for entity in entitys:
