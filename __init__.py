@@ -125,18 +125,19 @@ class LearnUnknownSkill(FallbackSkill):
         entitys = self.settings["entity_db"][self.lang]
         for entity in entitys:
             values = entitys[entity]
-            # create intent file for padatious
-            path = join(self._dir, "vocab", self.lang,
-                        entity + ".entity")
-            with open(path, "r") as f:
-                lines = f.readlines
+            if len(values):
+                # create intent file for padatious
+                path = join(self._dir, "vocab", self.lang,
+                            entity + ".entity")
+                with open(path, "r") as f:
+                    lines = f.readlines
 
-            with open(path, "a") as f:
-                for value in values:
-                    if value not in lines:
-                        f.write(value+"\n")
+                with open(path, "a") as f:
+                    for value in values:
+                        if value not in lines:
+                            f.write(value+"\n")
 
-            self.register_entity_file(entity + ".entity")
+                self.register_entity_file(entity + ".entity")
 
         # create .intent and .dialog
         utterances = self.settings["utterance_db"][self.lang]
