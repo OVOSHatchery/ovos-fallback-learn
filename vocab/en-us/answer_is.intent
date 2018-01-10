@@ -2,3 +2,11 @@ the answer for {question} is {answer}
 one answer for {question} is {answer}
 the correct answer for {question} is {answer}
 an answer for {question} can be {answer}
+answer of {question} is {answer}
+meaning of {question} is {answer}
+the answer for {question_verb} {question} is {answer}
+one answer for {question_verb} {question} is {answer}
+the correct answer for {question_verb} {question} is {answer}
+an answer for {question_verb} {question} can be {answer}
+answer of {question_verb} {question} is {answer}
+meaning of {question_verb} {question} is {answer}

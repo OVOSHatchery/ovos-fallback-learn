@@ -41,9 +41,15 @@ class LearnUnknownSkill(FallbackSkill):
         self.settings["answer_depth"] = self.settings.get("answer_depth", 5)
         self.settings["priority"] = self.settings.get("priority", 5)
 
+        self.questions = []
+
     def initialize(self):
-        # read keywords
+        # read entity parsing keywords
         self.entity_words = self.read_voc_lines("entity_words")
+
+        # questions, this is replaced with an entity to try help avoid some
+        # mistakes in padatious
+        self.register_entity_file("question_verb.entity")
 
         # high priority to always call handler, tweak number if you only
         # want utterances after a certain fallback
@@ -119,10 +125,8 @@ class LearnUnknownSkill(FallbackSkill):
             else:
                 # merge without duplicates
                 for answer in answers:
-                    if answer not in self.settings["utterance_db"][lang][
-                        utterance]:
-                        self.settings["utterance_db"][lang][utterance].append(
-                            answer)
+                    if answer not in self.settings["utterance_db"][lang][utterance]:
+                        self.settings["utterance_db"][lang][utterance].append(answer)
 
         # optionally do a manual settings save
         self.settings.store()
@@ -231,7 +235,9 @@ class LearnUnknownSkill(FallbackSkill):
 
     def handle_new_answer(self, message):
         answer = message.data.get("answer")
+        answer = self.parse_entities(answer)
         question = message.data.get("question")
+        question = self.parse_entities(question)
         self.add_utterances_to_db(question, answer)
         self.create_learned_intents()
         self.speak_dialog("new.answer", {"question": question, "answer":
