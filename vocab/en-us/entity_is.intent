@@ -1,0 +1,5 @@
+{value} is an example of {entity}
+{entity} can be {value}
+{entity} is a kind of {value}
+a possible value of {entity} is {value}
+a possible kind of {entity} is {value}
