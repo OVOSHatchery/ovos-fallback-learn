@@ -20,13 +20,6 @@ import random
 class LearnUnknownSkill(FallbackSkill):
 
     def initialize(self):
-        # ensure paths exist
-        if not exists(join(self._dir, "vocab", self.lang)):
-            makedirs(join(self._dir, "vocab", self.lang))
-
-        if not exists(join(self._dir, "dialog", self.lang)):
-            makedirs(join(self._dir, "dialog", self.lang))
-
         # start a utterance database
         self.entity_words = []
 
