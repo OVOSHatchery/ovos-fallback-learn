@@ -1,5 +1,3 @@
-# Copyright 2017 Mycroft AI, Inc.
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -14,14 +12,14 @@
 
 from os.path import join, exists
 from os import makedirs
-from mycroft.util.log import LOG
-from mycroft.skills.core import FallbackSkill
+from ovos_utils.log import LOG
+from ovos_workshop.skills.ovos import OVOSSkill
 import random
 
 
 class LearnUnknownSkill(FallbackSkill):
-    def __init__(self):
-        super(LearnUnknownSkill, self).__init__()
+
+    def initialize(self):
         # ensure paths exist
         if not exists(join(self._dir, "vocab", self.lang)):
             makedirs(join(self._dir, "vocab", self.lang))
@@ -43,7 +41,6 @@ class LearnUnknownSkill(FallbackSkill):
 
         self.questions = []
 
-    def initialize(self):
         # read entity parsing keywords
         self.entity_words = self.read_voc_lines("entity_words")
 
@@ -53,7 +50,6 @@ class LearnUnknownSkill(FallbackSkill):
 
         # high priority to always call handler, tweak number if you only
         # want utterances after a certain fallback
-
         self.register_fallback(self.handle_fallback,
                                self.settings["priority"])
 
@@ -283,6 +279,3 @@ class LearnUnknownSkill(FallbackSkill):
         # always return False so other fallbacks may still trigger
         return False
 
-
-def create_skill():
-    return LearnUnknownSkill()
