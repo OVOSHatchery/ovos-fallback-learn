@@ -10,11 +10,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
 from os.path import join, exists
-from os import makedirs
+
 from ovos_utils.log import LOG
 from ovos_workshop.skills.fallback import FallbackSkill
-import random
 
 
 class LearnUnknownSkill(FallbackSkill):
@@ -43,8 +43,7 @@ class LearnUnknownSkill(FallbackSkill):
 
         # high priority to always call handler, tweak number if you only
         # want utterances after a certain fallback
-        self.register_fallback(self.handle_fallback,
-                               self.settings["priority"])
+        self.register_fallback(self.handle_fallback, self.settings["priority"])
 
         # register learned utterances
         self.create_learned_intents()
@@ -59,17 +58,15 @@ class LearnUnknownSkill(FallbackSkill):
 
         # the answer for X is Y intent
         # add X utterance with Y answer handler and create intent
-        self.register_intent_file("answer_is.intent",
-                                  self.handle_new_answer)
+        self.register_intent_file("answer_is.intent", self.handle_new_answer)
 
         # intent add stuff to .entity files
         # "chicken is an example of animal" -> if animal.entity does not exist
         # create it, add "chicken" to that file
-        self.register_intent_file("entity_is.intent",
-                                  self.handle_new_entity)
+        self.register_intent_file("entity_is.intent", self.handle_new_entity)
 
     def read_voc_lines(self, name):
-        with open(join(self._dir, "vocab", self.lang, name + '.voc')) as f:
+        with open(join(self.root_dir, "vocab", self.lang, name + '.voc')) as f:
             return filter(bool, map(str.strip, f.read().split('\n')))
 
     def parse_entities(self, answer):
@@ -84,8 +81,7 @@ class LearnUnknownSkill(FallbackSkill):
                 entity = word_prev
                 words[idx] = ""
                 words[idx - 1] = "{" + entity + "}"
-                if entity not in self.settings["entity_db"][
-                    self.lang.keys()]:
+                if entity not in self.settings["entity_db"][self.lang]:
                     self.settings["entity_db"][self.lang][entity] = []
 
         return " ".join(words)
@@ -128,8 +124,7 @@ class LearnUnknownSkill(FallbackSkill):
             LOG.info("Entities to learn: " + str(values))
             if len(values):
                 # create intent file for padatious
-                path = join(self._dir, "vocab", self.lang,
-                            entity + ".entity")
+                path = join(self.root_dir, "vocab", self.lang, entity + ".entity")
                 if exists(path):
                     with open(path, "r") as f:
                         lines = f.readlines()
@@ -153,7 +148,7 @@ class LearnUnknownSkill(FallbackSkill):
                 if len(answers):
                     utterance = self.parse_entities(utterance)
                     # create intent file for padatious
-                    path = join(self._dir, "vocab", self.lang,
+                    path = join(self.root_dir, "vocab", self.lang,
                                 utterance + ".intent")
 
                     if exists(path):
@@ -167,7 +162,7 @@ class LearnUnknownSkill(FallbackSkill):
                             f.write(utterance + "\n")
 
                     # create learned answers dialog file
-                    path = join(self._dir, "dialog", self.lang,
+                    path = join(self.root_dir, "dialog", self.lang,
                                 utterance + ".dialog")
 
                     if exists(path):
@@ -199,13 +194,13 @@ class LearnUnknownSkill(FallbackSkill):
         value = message.data.get("value")
         entity = message.data.get("entity")
         lang = message.data.get("lang", self.lang)
-        if entity not in self.settings["entity_db"][self.lang].keys():
+        if entity not in self.settings["entity_db"][self.lang]:
             self.settings["entity_db"][self.lang][entity] = [value]
         else:
             self.settings["entity_db"][self.lang][entity].append(value)
 
         values = self.settings["entity_db"][self.lang][entity]
-        path = join(self._dir, "vocab", lang, entity + ".entity")
+        path = join(self.root_dir, "vocab", lang, entity + ".entity")
 
         if not exists(path):
             with open(path, "w") as f:
@@ -229,8 +224,10 @@ class LearnUnknownSkill(FallbackSkill):
         question = self.parse_entities(question)
         self.add_utterances_to_db(question, answer)
         self.create_learned_intents()
-        self.speak_dialog("new.answer", {"question": question, "answer":
-            answer})
+        self.speak_dialog("new.answer", {
+            "question": question,
+            "answer": answer
+        })
 
     def handle_update_learned(self, message):
         # register in padatious
@@ -243,7 +240,7 @@ class LearnUnknownSkill(FallbackSkill):
         if len(utterances):
             LOG.info("utterances to learn: " + str(utterances))
             # pick a random one
-            utterance = random.choice(utterances.keys())
+            utterance = random.choice(utterances)
             answers = utterances[utterance]
             # if less than X sample answers
             if len(answers) <= self.settings["answer_depth"]:
@@ -253,9 +250,10 @@ class LearnUnknownSkill(FallbackSkill):
                     answer = self.parse_entities(answer)
                     # if user answered add to database
                     self.add_utterances_to_db(utterance, answer, self.lang)
-                    self.speak_dialog("new.answer",
-                                      {"question": utterance, "answer":
-                                          answer})
+                    self.speak_dialog("new.answer", {
+                        "question": utterance,
+                        "answer": answer
+                    })
                     # register in padatious
                     self.create_learned_intents()
                     return
@@ -271,4 +269,3 @@ class LearnUnknownSkill(FallbackSkill):
 
         # always return False so other fallbacks may still trigger
         return False
-
