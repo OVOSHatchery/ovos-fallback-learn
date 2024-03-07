@@ -13,7 +13,7 @@
 from os.path import join, exists
 from os import makedirs
 from ovos_utils.log import LOG
-from ovos_workshop.skills.ovos import OVOSSkill
+from ovos_workshop.skills.fallback import FallbackSkill
 import random
 
 
